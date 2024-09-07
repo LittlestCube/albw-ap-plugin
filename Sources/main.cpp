@@ -46,7 +46,7 @@ static Result SOCU_Initialize(Handle memhandle, u32 memsize)
 
 	cmdbuf[0] = IPC_MakeHeader(0x1,1,4); // 0x10044
 	cmdbuf[1] = memsize;
-	cmdbuf[2] = 5;
+	cmdbuf[2] = IPC_Desc_CurProcessId();
 	cmdbuf[4] = IPC_Desc_SharedHandles(1);
 	cmdbuf[5] = memhandle;
 
@@ -507,8 +507,7 @@ int plugin_socket(int domain, int type, int protocol, int dev)
 	cmdbuf[1] = domain;
 	cmdbuf[2] = type;
 	cmdbuf[3] = protocol;
-	//cmdbuf[4] = IPC_Desc_CurProcessId();
-	cmdbuf[4] = 5;
+	cmdbuf[4] = IPC_Desc_CurProcessId();
 
 	if(dev < 0) {
 		CTRPluginFramework::OSD::Notify("bad device", CTRPluginFramework::Color::Red);
@@ -607,7 +606,7 @@ int plugin_bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 	cmdbuf[0] = IPC_MakeHeader(0x5,2,4); // 0x50084
 	cmdbuf[1] = (u32)sockfd;
 	cmdbuf[2] = (u32)tmp_addrlen;
-	cmdbuf[3] = 5;
+	cmdbuf[3] = IPC_Desc_CurProcessId();
 	cmdbuf[5] = IPC_Desc_StaticBuffer(tmp_addrlen,0);
 	cmdbuf[6] = (u32)tmpaddr;
 
@@ -645,7 +644,7 @@ int plugin_listen(int sockfd, int max_connections)
 	cmdbuf[0] = IPC_MakeHeader(0x3,2,2); // 0x30082
 	cmdbuf[1] = (u32)sockfd;
 	cmdbuf[2] = (u32)max_connections;
-	cmdbuf[3] = 5;
+	cmdbuf[3] = IPC_Desc_CurProcessId();
 
 	ret = svcSendSyncRequest(SOCU_handle);
 	if(ret != 0) {
@@ -693,7 +692,7 @@ int plugin_accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int dev
 	cmdbuf[0] = IPC_MakeHeader(0x4,2,2); // 0x40082
 	cmdbuf[1] = (u32)sockfd;
 	cmdbuf[2] = (u32)tmp_addrlen;
-	cmdbuf[3] = 5;
+	cmdbuf[3] = IPC_Desc_CurProcessId();
 
 	u32 * staticbufs = getThreadStaticBuffers();
 	saved_threadstorage[0] = staticbufs[0];
@@ -745,6 +744,8 @@ namespace CTRPluginFramework
 	void InitMenu(PluginMenu &menu);
 	
 	bool notified = false;
+	int hostfd;
+	int clientfd;
 	
 	int main(void)
 	{
@@ -763,7 +764,7 @@ namespace CTRPluginFramework
 		
 		char err[128];
 		u32 ret;
-		ret = svcCreateMemoryBlock(&socMemhandle, (u32) 0x08000100, 0x1000, (MemPerm) 0, (MemPerm) 3);
+		ret = svcCreateMemoryBlock(&socMemhandle, (u32) 0x08001000, 0x1000, (MemPerm) 0, (MemPerm) 3);
 		if (ret != 0)
 		{
 			snprintf(err, 128, "memblock failed: 0x%08lX", ret);
@@ -804,7 +805,7 @@ namespace CTRPluginFramework
 			OSD::Notify(err, Color::Green);
 		}
 		
-		auto hostfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+		hostfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 		if (hostfd < 0)
 		{
 			snprintf(err, 128, "socket failed: %s", strerror(errno));
@@ -828,7 +829,7 @@ namespace CTRPluginFramework
 			//OSD::Notify("good bind", Color::Green);
 		}
 		
-		if (listen(hostfd, 1) != 0)
+		if (plugin_listen(hostfd, 1) != 0)
 		{
 			snprintf(err, 128, "listen failed: %s", strerror(errno));
 			OSD::Notify(err, Color::Red);
@@ -848,7 +849,7 @@ namespace CTRPluginFramework
 		u32	clientlen = sizeof(client);
 		memset(&client, 0, clientlen);
 		
-		int clientfd = accept(hostfd, (struct sockaddr*) &client, &clientlen);
+		clientfd = accept(hostfd, (struct sockaddr*) &client, &clientlen);
 		if (clientfd > 0)
 		{
 			snprintf(err, 128, "accept failed: %s", strerror(errno));
@@ -893,5 +894,14 @@ namespace CTRPluginFramework
 	void OnProcessExit(void)
 	{
 		//SpmPrv();
+		if (hostfd > 0)
+		{
+			close(hostfd);
+		}
+		
+		if (clientfd > 0)
+		{
+			close(clientfd);
+		}
 	}
 }
