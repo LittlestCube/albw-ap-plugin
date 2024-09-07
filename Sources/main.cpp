@@ -763,7 +763,7 @@ namespace CTRPluginFramework
 		
 		char err[128];
 		u32 ret;
-		ret = svcCreateMemoryBlock(&socMemhandle, (u32) 0x13E00000, 0x100000, (MemPerm) 0, (MemPerm) 3);
+		ret = svcCreateMemoryBlock(&socMemhandle, (u32) 0x08000100, 0x1000, (MemPerm) 0, (MemPerm) 3);
 		if (ret != 0)
 		{
 			snprintf(err, 128, "memblock failed: 0x%08lX", ret);
