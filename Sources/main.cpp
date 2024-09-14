@@ -218,11 +218,16 @@ namespace CTRPluginFramework
 	// Useful to save settings, undo patchs or clean up things
 	void OnProcessExit(void)
 	{
+		if (hostfd > 0)
+		{
+			close(hostfd);
+		}
+		
+		socExit();
+		
 		if (SOC_buffer != NULL)
 		{
 			free(SOC_buffer);
 		}
-		
-		socExit();
 	}
 }
