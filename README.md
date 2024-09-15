@@ -2,11 +2,11 @@
 
 ## CURRENTLY THIS MUST BE GENERATED/RUN ON THE CUSTOM VERSION OF THE APWORLD!! You need to install the included `.pyd`/`.so` file too.
 
-1. Download the `plugin.3gx` and `boot.firm` files from [releases](https://github.com/LittlestCube/albw-ap-plugin/releases/latest).
+1. Download the `plugin.3gx` and `Luma3DS` files from [releases](https://github.com/LittlestCube/albw-ap-plugin/releases/latest).
 
 2. On your 3DS's SD card, rename your original `boot.firm` file to something like `boot.firm.bak`.
 
-3. Copy the `boot.firm` you downloaded to the root of your SD card.
+3. Copy the `boot.firm` from the `Luma3DS` zip you downloaded to the root of your SD card.
 
 4. Copy `plugin.3gx` to `/luma/plugins/00040000000EC300/` on your SD card.
 
