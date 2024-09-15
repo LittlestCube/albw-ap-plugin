@@ -58,17 +58,23 @@ void write8(u32 addr, u8 value)
 
 namespace CTRPluginFramework
 {
-	int hostfd;
+	int hostfd = 0;
 	
 	struct sockaddr_in client;
 	u32 clientlen;
 	
-	void socket_thread_func(void* arg)
+	Endianness endianness;
+	
+	char ip_str[16];
+	
+	void init_sockets()
 	{
-		SOC_buffer = (u32*) aligned_alloc(0x1000, SOC_MEM_SIZE);
+		if (SOC_buffer == NULL)
+		{
+			SOC_buffer = (u32*) aligned_alloc(0x1000, SOC_MEM_SIZE);
+		}
 		
 		socInit((u32*) SOC_buffer, SOC_MEM_SIZE);
-		hostfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 		
 		struct sockaddr_in addr;
 		memset(&addr, 0, sizeof(addr));
@@ -76,75 +82,58 @@ namespace CTRPluginFramework
 		addr.sin_addr.s_addr = gethostid();
 		addr.sin_port = htons(45987);
 		
-		bind(hostfd, (struct sockaddr*) &addr, sizeof(struct sockaddr_in));
-		
-		char ip_str[16];
 		inet_ntop(AF_INET, (const void*) &addr.sin_addr, ip_str, 16);
 		
-		char connect_msg[128];
-		snprintf(connect_msg, 128, "Run `/3ds %s' from the client...", ip_str);
-		
-		OSD::Notify(connect_msg, Color::Orange);
+		if (hostfd <= 0 || ip_str[0] == '0')
+		{
+			if (hostfd > 0)
+			{
+				close(hostfd);
+			}
+			
+			hostfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+		}
 		
 		clientlen = sizeof(client);
-		memset(&client, 0, clientlen);
+		
+		bind(hostfd, (struct sockaddr*) &addr, sizeof(struct sockaddr_in));
 		
 		fcntl(hostfd, F_SETFL, fcntl(hostfd, F_GETFL, 0) | O_NONBLOCK);
-		
-		u32 recvlen = -1;
-		u8 cmd[50];
-		Endianness endianness = LITTLE;
-		
-		while (recvlen == -1)
-		{
-			recvlen = recvfrom(hostfd, cmd, 50, 0, (struct sockaddr*) &client, &clientlen);
-		}
-		
-		if (cmd[3] != 0)
-		{
-			// i mean like when would this ever fire
-			endianness = BIG;
-		}
-		
-		memset(cmd, 0, 16);
-		sendto(hostfd, cmd, 16, 0, (struct sockaddr*) &client, clientlen);
-		
-		OSD::ClearAllNotifications();
-		
-		inet_ntop(AF_INET, (const void*) &client.sin_addr, ip_str, 16);
-		
-		snprintf(connect_msg, 128, "Got connection from %s!", ip_str);
-		OSD::Notify(connect_msg, Color::Green);
-		
-		Clock start;
-		bool checkClock = true;
+	}
+	
+	void socket_func()
+	{
+		u8 cmd[16 + 32 + 2];
+		int recvlen;
 		
 		while (true)
 		{
-			if (checkClock && start.HasTimePassed(Seconds(3.0f)))
-			{
-				OSD::ClearAllNotifications();
-				
-				checkClock = false;
-			}
+			init_sockets();
 			
 			recvlen = recvfrom(hostfd, cmd, 50, 0, (struct sockaddr*) &client, &clientlen);
 			
 			if (recvlen != -1)
 			{
+				OSD::ClearAllNotifications();
+				
 				switch ((MemCommand) MEM(u32, &cmd[8]))
 				{
+					case NONE:
+					{
+						sendto(hostfd, cmd, 16, 0, (struct sockaddr*) &client, clientlen);
+						
+						break;
+					}
+					
 					case READ:
 					{
 						u32 address = MEM(u32, &cmd[16]);
 						u32 size = MEM(u32, &cmd[20]);
 						
 						size_t i;
-						for (i = 0; i < size && i < 32; ++i)
+						for (i = 0; i < size && i < 0x80; ++i)
 						{
 							cmd[16 + i] = read8(address + i);
-							
-							svcSleepThread(200000LL);
 						}
 						
 						sendto(hostfd, cmd, 16 + i, 0, (struct sockaddr*) &client, clientlen);
@@ -157,11 +146,9 @@ namespace CTRPluginFramework
 						u32 address = MEM(u32, &cmd[16]);
 						u32 size = MEM(u32, &cmd[20]);
 						
-						for (size_t i = 0; i < size && i < 32; ++i)
+						for (size_t i = 0; i < size && i < 24; ++i)
 						{
 							write8(address + i, cmd[24 + i]);
-							
-							svcSleepThread(200000LL);
 						}
 						
 						sendto(hostfd, cmd, 16, 0, (struct sockaddr*) &client, clientlen);
@@ -171,7 +158,26 @@ namespace CTRPluginFramework
 				}
 			}
 			
-			svcSleepThread(250000000LL);
+			svcSleepThread(25000LL);
+		}
+	}
+	
+	void handle_event(Process::Event event)
+	{
+		switch (event)
+		{
+			case Process::Event::EXIT:
+			{
+				if (hostfd > 0)
+				{
+					close(hostfd);
+					hostfd = 0;
+				}
+				
+				socExit();
+				
+				break;
+			}
 		}
 	}
 	
@@ -200,34 +206,17 @@ namespace CTRPluginFramework
 		
 		else
 		{
-			ThreadEx socket_thread = ThreadEx(socket_thread_func, 0x1000, 22, -1);
-			socket_thread.Start(nullptr);
+			Process::SetProcessEventCallback(handle_event);
 			
-			socket_thread.Join(true);
+			init_sockets();
+			
+			char connect_msg[128];
+			snprintf(connect_msg, 128, "Run `/3ds %s' from the client...", ip_str);
+			OSD::Notify(connect_msg, Color::Orange);
+			
+			socket_func();
 		}
 		
 		return 0;
-	}
-	
-	void PatchProcess(FwkSettings& settings)
-	{
-		Process::Write32(0x6FE5F8 + 4, 1);
-	}
-	
-	// This function is called when the process exits
-	// Useful to save settings, undo patchs or clean up things
-	void OnProcessExit(void)
-	{
-		if (hostfd > 0)
-		{
-			close(hostfd);
-		}
-		
-		socExit();
-		
-		if (SOC_buffer != NULL)
-		{
-			free(SOC_buffer);
-		}
 	}
 }
