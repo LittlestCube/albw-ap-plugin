@@ -1,6 +1,6 @@
 # ALBW AP on a 3DS
 
-## CURRENTLY THIS MUST BE GENERATED/RUN ON THE CUSTOM VERSION OF THE APWORLD!! You need to install the included `.pyd`/`.so` file too.
+## CURRENTLY THIS MUST BE RUN ON THE CUSTOM VERSION OF THE APWORLD!! You need to install the included `.pyd`/`.so` file too.
 
 1. Download the `plugin.3gx`, `albw-ap-plugin-support.apworld`, `.pyd` file (or `.so` file on non-windows) and `Luma3DS` files from [releases](https://github.com/LittlestCube/albw-ap-plugin/releases/latest).
 
