@@ -67,6 +67,8 @@ namespace CTRPluginFramework
 	
 	char ip_str[16];
 	
+	bool uninited = false;
+	
 	void init_sockets()
 	{
 		if (SOC_buffer == NULL)
@@ -86,12 +88,25 @@ namespace CTRPluginFramework
 		
 		if (hostfd <= 0 || ip_str[0] == '0')
 		{
+			uninited = true;
+			
 			if (hostfd > 0)
 			{
 				close(hostfd);
 			}
 			
 			hostfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+		}
+		
+		else if (uninited)
+		{
+			OSD::ClearAllNotifications();
+			
+			char connect_msg[128];
+			snprintf(connect_msg, 128, "Run `/3ds %s' from the client...", ip_str);
+			OSD::Notify(connect_msg, Color::Orange);
+			
+			uninited = false;
 		}
 		
 		clientlen = sizeof(client);
@@ -209,10 +224,6 @@ namespace CTRPluginFramework
 			Process::SetProcessEventCallback(handle_event);
 			
 			init_sockets();
-			
-			char connect_msg[128];
-			snprintf(connect_msg, 128, "Run `/3ds %s' from the client...", ip_str);
-			OSD::Notify(connect_msg, Color::Orange);
 			
 			socket_func();
 		}
