@@ -17,3 +17,5 @@ Description: |
 Compatibility: Any
 
 MemorySize: 5MiB
+
+UsePrivateMemory: true
