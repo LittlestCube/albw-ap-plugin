@@ -12,7 +12,7 @@
 
 5. Install the apworld file, and copy the `.pyd`/`.so` file to `Archipelago/lib`.
 
-6. Once you generate a patch from the APWorld, copy it to `/luma/titles/00040000000EC300/` on your SD card.
+6. Once you generate a zip from the .apalbw patch, copy the folder inside to `/luma/titles/` on your SD card.
 
 7. Re-insert your SD card into your 3DS and power it on.
 	- If you used FTP to transfer your files, and copied the new Luma `boot.firm` file, reboot your 3DS now.
